@@ -528,7 +528,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
           <label class="toggle"><input type="checkbox" id="stLowVram" checked><span class="box"></span><span><span data-i18n="低显存优化">低显存优化</span><span class="t-desc" data-i18n="精度无损·分块注意力">精度无损·分块注意力</span></span></label>
           <label class="toggle"><input type="checkbox" id="stSage"><span class="box"></span><span>SageAttention<span class="t-desc" data-i18n="~2×加速·近似注意力">~2×加速·近似注意力</span></span></label>
           <label class="toggle"><input type="checkbox" id="stTurbo"><span class="box"></span><span>Turbo LoRA<span class="t-desc" data-i18n="v2 full 少步用">v2 full 少步用</span></span></label>
-          <div class="field" id="stLoraField" style="display:none;margin-top:5px"><input type="text" class="txt" id="stLora" list="installedLoras" placeholder="留空=自动选" data-i18n-ph="留空=自动选"></div>
+          <div class="field" id="stLoraField" style="display:none;margin-top:5px"><input type="text" class="txt" id="stLora" placeholder="留空=自动选" data-i18n-ph="留空=自动选"></div>
           <div class="native-settings" style="display:none">
             <div class="field"><label>LoRA strength</label><input class="num" id="stLoraStrength" type="number" min="0" max="2" step="0.05" value="1"></div>
             <div class="field"><label>Sampler</label><select class="sel" id="stSampler"><option value="res_multistep">res_multistep</option><option value="euler">euler</option></select></div>
@@ -563,7 +563,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
       <label class="toggle"><input type="checkbox" id="pLowVram" checked><span class="box"></span><span data-i18n="低显存优化">低显存优化</span></label>
       <label class="toggle"><input type="checkbox" id="pSage"><span class="box"></span><span>SageAttention</span></label>
       <label class="toggle"><input type="checkbox" id="pTurbo"><span class="box"></span><span>Turbo LoRA</span></label>
-      <div class="field" id="pLoraField" style="display:none;margin-top:5px"><input type="text" class="txt" id="pLora" list="installedLoras" placeholder="留空=自动选" data-i18n-ph="留空=自动选"></div>
+      <div class="field" id="pLoraField" style="display:none;margin-top:5px"><input type="text" class="txt" id="pLora" placeholder="留空=自动选" data-i18n-ph="留空=自动选"></div>
       <div class="native-settings" style="display:none">
         <div class="field"><label>LoRA strength</label><input class="num" id="pLoraStrength" type="number" min="0" max="2" step="0.05" value="1"></div>
         <div class="field"><label>Sampler</label><select class="sel" id="pSampler"><option value="res_multistep">res_multistep</option><option value="euler">euler</option></select></div>
@@ -572,8 +572,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
     </div>
     <div style="display:flex;gap:8px"><button class="btn" id="pReset" style="flex:1"><span data-i18n="恢复默认">恢复默认</span></button><button class="btn primary" id="pApply" style="flex:1"><span data-i18n="应用">应用</span></button></div>
   </div>
-
-  <datalist id="installedLoras"></datalist>
 
   <!-- SHARED: LIGHTBOX -->
   <div class="lightbox" id="lightbox">
@@ -626,6 +624,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 <script>
 // ===== I18N (zh=source default; EN_MAP: zh template -> en template, {x} placeholders) =====
 const EN_MAP={
+'不使用 LoRA':'No LoRA',
 // topbar
 '对话流':'Chat','总览':'Overview','Studio':'Studio','检测中':'Checking…','在线':'Online','离线':'Offline',
 // views empty / hints
@@ -718,17 +717,44 @@ function configureNativeUI(s){
     ['pLowVram','stLowVram','pSage','stSage'].forEach(id=>$(id).closest('label').style.display='none');
     $('chipSage').style.display='none';
     ['p','st'].forEach(pre=>{
-      const label=$(pre+'Turbo').closest('label').lastElementChild;label.dataset.i18n='加载 LoRA';label.textContent=t('加载 LoRA');
-      $(pre+'Lora').placeholder=t('选择已安装的 LoRA');
-      $(pre+'Lora').setAttribute('data-i18n-ph','选择已安装的 LoRA');
+      $(pre+'Turbo').closest('label').style.display='none';
+      const select=document.createElement('select');select.id=pre+'Lora';select.className='sel';select.setAttribute('aria-label','LoRA');
+      $(pre+'Lora').replaceWith(select);
+      const label=document.createElement('label');label.id=pre+'LoraCount';label.htmlFor=select.id;select.before(label);
+      select.onchange=()=>{
+        App.params.lora_name=select.value;App.params.turbo_lora=!!select.value;
+        ['p','st'].forEach(p=>{$(p+'Turbo').checked=App.params.turbo_lora;$(p+'Lora').value=select.value;});
+      };
       [...$(pre+'Model').options].forEach(o=>{if(o.value==='full'){o.textContent=t('完整 full（质量）');o.setAttribute('data-i18n','完整 full（质量）');}});
     });
     document.querySelectorAll('.native-settings').forEach(el=>{el.style.display='block';const title=el.closest('.st-sec,.pop-sec').querySelector('.st-title span,.pop-title span');if(title){title.dataset.i18n='LoRA 与采样';title.textContent=t('LoRA 与采样');}});
+    renderInstalledLoras(s.loras||[]);
     syncTaskUI();syncStudioPanel();syncPopup();
   }
-  $('installedLoras').innerHTML=(s.loras||[]).map(n=>`<option value="${esc(n)}"></option>`).join('');
+  if(s.loras)renderInstalledLoras(s.loras);
+}
+function renderInstalledLoras(names){
+  if(JSON.stringify(names)===JSON.stringify(App.settings.loras))return;
+  App.settings.loras=names;
+  const groups=new Map();
+  names.forEach(name=>{
+    const family=name.match(/AfterMidnight|PinkFluffyBunny|NaughtyTimes|Sydney|Turbo/i)?.[0]||'LoRA';
+    const key=family.toLowerCase()==='turbo'?'Turbo':family;
+    if(!groups.has(key))groups.set(key,[]);
+    groups.get(key).push(name);
+  });
+  const html=`<option value="" data-i18n="不使用 LoRA">${t('不使用 LoRA')}</option>`+[...groups].map(([group,files])=>`<optgroup label="${esc(group)} (${files.length})">${files.map(name=>`<option value="${esc(name)}">${esc(name.replace(/\.safetensors$/i,''))}</option>`).join('')}</optgroup>`).join('');
+  ['p','st'].forEach(pre=>{
+    const select=$(pre+'Lora'),value=select.value;
+    select.innerHTML=html;select.value=names.includes(value)?value:'';
+    $(pre+'LoraCount').textContent=`LoRA (${names.length})`;
+  });
 }
 function syncNativeParams(pre){
+  if(App.settings.native_pipeline){
+    $(pre+'LoraField').style.display='block';
+    $(pre+'Lora').value=App.params.turbo_lora?App.params.lora_name:'';
+  }
   $(pre+'LoraStrength').value=App.params.lora_strength??1;
   $(pre+'Sampler').value=App.params.sampler||'res_multistep';
   $(pre+'Scheduler').value=App.params.scheduler||'simple';
