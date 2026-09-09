@@ -175,6 +175,24 @@ COMFYUI_OUTPUT=/path/to/ComfyUI/output \
 
 ## ⚙️ 配置
 
+### 使用 ComfyUI 原生 H3 节点
+
+已有支持 `MiniMaxH3ImageToVideo` / `MiniMaxH3ReferenceToVideo` 的 ComfyUI 时，可用原生模式接入，无需安装 T8 或 VideoHelperSuite：
+
+```bash
+COMFYUI_URL=http://127.0.0.1:8189 \
+COMFYUI_INPUT=/path/to/ComfyUI/input \
+COMFYUI_OUTPUT=/path/to/outputs \
+H3WEBUI_PIPELINE=native \
+H3WEBUI_TEXT_ENCODER=qwen3vl_32b_minimax_h3_bf16.safetensors \
+H3WEBUI_FULL_MODEL=minimax_h3_fl2va_bf16.safetensors \
+python webui/server.py
+```
+
+原生模式使用核心采样和音视频解码节点、ComfyUI 自动显存管理，默认 20 步。界面可选择已安装的 LoRA、强度、sampler 和 scheduler；例如 AfterMidnight 使用其作者指定的 Euler + beta。LoRA 适用的 Ref2VA、裁剪或完整 FL2VA 底模仍需按作者说明选择。启用 LoRA 时必须指定文件，不会自动叠加 Turbo。
+
+`H3WEBUI_PRUNED_MODEL` / `H3WEBUI_FULL_MODEL` 可覆盖对应模型文件名，`H3WEBUI_TEXT_ENCODER` 可覆盖文本编码器文件名。未设置 `H3WEBUI_PIPELINE=native` 时保留原 T8 接入方式。
+
 全部通过**环境变量**覆盖，无配置文件：
 
 | 变量 | 默认值 | 说明 |

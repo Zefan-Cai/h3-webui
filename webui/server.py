@@ -32,6 +32,8 @@ COMFYUI_INPUT = Path(os.environ.get("COMFYUI_INPUT", str(_COMFY_IN)))
 COMFYUI_OUTPUT = Path(os.environ.get("COMFYUI_OUTPUT", str(_COMFY_OUT)))
 PORT = int(os.environ.get("H3WEBUI_PORT", "8080"))
 HOST = os.environ.get("H3WEBUI_HOST", "127.0.0.1")
+NATIVE_PIPELINE = os.environ.get("H3WEBUI_PIPELINE", "t8") == "native"
+TEXT_ENCODER = os.environ.get("H3WEBUI_TEXT_ENCODER", "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors")
 
 
 def _comfy_models_dirs() -> list:
@@ -82,8 +84,8 @@ WORKSPACES_DIR.mkdir(exist_ok=True)
 CLIENT_ID = "h3webui-" + uuid.uuid4().hex[:12]
 
 MODELS = {
-    "pruned": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
-    "full":   "minimax_h3_fl2va_int8_convrot.safetensors",
+    "pruned": os.environ.get("H3WEBUI_PRUNED_MODEL", "minimax_h3_fl2va_pruned_int8_convrot.safetensors"),
+    "full":   os.environ.get("H3WEBUI_FULL_MODEL", "minimax_h3_fl2va_int8_convrot.safetensors"),
     # ref2va: 文件名是占位默认值, 实际以 models/diffusion_models 下的真实文件为准 (见 find_ref2va_model)
     "ref2va": "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
 }
@@ -235,6 +237,15 @@ def duration_to_frames(seconds: int) -> int:
 
 # ==================== ComfyUI prompt 图构建 ====================
 def build_graph(prompt: str, params: dict, image_name: str, width: int, height: int, length: int) -> dict:
+    if NATIVE_PIPELINE:
+        # 与 r2v 共用原生采样/音视频解码链，仅替换底模和首帧 conditioning。
+        g = build_ref2va_graph(prompt, params, [image_name], width, height, length)
+        g["4"]["inputs"]["unet_name"] = MODELS.get(params.get("model", "pruned"), MODELS["pruned"])
+        g["6"] = {"class_type": "MiniMaxH3ImageToVideo", "inputs": {
+            "clip": ["3", 0], "vae": ["1", 0], "prompt": prompt,
+            "width": width, "height": height, "length": length, "first_frame": ["20", 0]}}
+        g["15"]["inputs"]["filename_prefix"] = g["15"]["inputs"]["filename_prefix"].replace("H3_R2V_", "H3_I2V_")
+        return g
     model = MODELS.get(params.get("model", "pruned"), MODELS["pruned"])
     steps = int(params.get("steps", 4))
     seed = int(params.get("seed", 0))
@@ -242,7 +253,7 @@ def build_graph(prompt: str, params: dict, image_name: str, width: int, height: 
     g = {
         "1":  {"class_type": "VAELoader",  "inputs": {"vae_name": "minimax_h3_video_vae_fp16.safetensors"}},
         "2":  {"class_type": "VAELoader",  "inputs": {"vae_name": "minimax_h3_audio_vae_fp32.safetensors"}},
-        "3":  {"class_type": "CLIPLoader", "inputs": {"clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", "type": "minimax", "device": "default"}},
+        "3":  {"class_type": "CLIPLoader", "inputs": {"clip_name": TEXT_ENCODER, "type": "minimax", "device": "default"}},
         "4":  {"class_type": "UNETLoader", "inputs": {"unet_name": model, "weight_dtype": "default"}},
         "6":  {"class_type": "LoadImage",  "inputs": {"image": image_name, "upload": "image"}},
         "7":  {"class_type": "MiniMaxH3AudioConditioningT8", "inputs": {
@@ -309,22 +320,22 @@ def build_ref2va_graph(prompt: str, params: dict, ref_images: list, width: int, 
     g = {
         "1":  {"class_type": "VAELoader",  "inputs": {"vae_name": "minimax_h3_video_vae_fp16.safetensors"}},
         "2":  {"class_type": "VAELoader",  "inputs": {"vae_name": "minimax_h3_audio_vae_fp32.safetensors"}},
-        "3":  {"class_type": "CLIPLoader", "inputs": {"clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", "type": "minimax", "device": "default"}},
+        "3":  {"class_type": "CLIPLoader", "inputs": {"clip_name": TEXT_ENCODER, "type": "minimax", "device": "default"}},
         "4":  {"class_type": "UNETLoader", "inputs": {"unet_name": unet_name, "weight_dtype": "default"}},
         # 参考图 LoadImage 挂到 node6.ref_images.ref_image_{i} (i=0..N-1), 从 id 20 起
     }
     model_src = "4"
-    if params.get("low_vram", True):
+    if params.get("low_vram", True) and not NATIVE_PIPELINE:
         g["4a"] = {"class_type": "MiniMaxChunkFeedForward", "inputs": {"model": [model_src, 0], "chunks": 2, "seq_threshold": 4096}}
         model_src = "4a"
         g["4b"] = {"class_type": "MiniMaxLowVRAMAttention", "inputs": {"model": [model_src, 0], "head_chunks": 4}}
         model_src = "4b"
-    if params.get("sage"):
+    if params.get("sage") and not NATIVE_PIPELINE:
         g["4c"] = {"class_type": "MiniMaxH3MemoryEfficientSageAttentionPatch", "inputs": {"model": [model_src, 0]}}
         model_src = "4c"
     if params.get("turbo_lora"):
         lora_name = params.get("lora_name") or DEFAULT_LORA
-        g["5"] = {"class_type": "LoraLoaderModelOnly", "inputs": {"lora_name": lora_name, "strength_model": 1.0, "model": [model_src, 0]}}
+        g["5"] = {"class_type": "LoraLoaderModelOnly", "inputs": {"lora_name": lora_name, "strength_model": float(params.get("lora_strength", 1.0)), "model": [model_src, 0]}}
         model_src = "5"
     # SigmaShift: 核心链的 shift 载体 (T8 链由 DualClockSamplerT8 内置 shift 12/3)
     g["5s"] = {"class_type": "MiniMaxH3SigmaShift", "inputs": {"model": [model_src, 0], "shift_video": 12.0, "shift_audio": 3.0}}
@@ -348,8 +359,8 @@ def build_ref2va_graph(prompt: str, params: dict, ref_images: list, width: int, 
 
     g["6"] =  {"class_type": "MiniMaxH3ReferenceToVideo", "inputs": node6}
     g["7"] =  {"class_type": "RandomNoise",            "inputs": {"noise_seed": seed}}
-    g["8"] =  {"class_type": "KSamplerSelect",         "inputs": {"sampler_name": "res_multistep"}}
-    g["9"] =  {"class_type": "BasicScheduler",         "inputs": {"model": ["5s", 0], "scheduler": "simple", "steps": steps, "denoise": 1.0}}
+    g["8"] =  {"class_type": "KSamplerSelect",         "inputs": {"sampler_name": params.get("sampler", "res_multistep")}}
+    g["9"] =  {"class_type": "BasicScheduler",         "inputs": {"model": ["5s", 0], "scheduler": params.get("scheduler", "simple"), "steps": steps, "denoise": 1.0}}
     g["10"] = {"class_type": "BasicGuider",            "inputs": {"model": ["5s", 0], "conditioning": ["6", 0]}}
     g["11"] = {"class_type": "SamplerCustomAdvanced",  "inputs": {
         "noise": ["7", 0], "guider": ["10", 0], "sampler": ["8", 0],
@@ -359,6 +370,9 @@ def build_ref2va_graph(prompt: str, params: dict, ref_images: list, width: int, 
     g["14"] = {"class_type": "CreateVideo",     "inputs": {"images": ["12", 0], "audio": ["13", 0], "fps": 24.0, "bit_depth": 8}}
     g["15"] = {"class_type": "SaveVideo",       "inputs": {
         "video": ["14", 0], "filename_prefix": prefix, "format": "auto", "codec": "auto"}}
+    if NATIVE_PIPELINE:
+        g["15"]["inputs"].pop("codec")
+        g["15"]["inputs"].update({"format": "mp4", "format.codec": "h264"})
     return g
 
 
@@ -811,11 +825,14 @@ async def generate(request):
         raise web.HTTPBadRequest(text="请填写提示词")
     params["task_type"] = task_type
     params.setdefault("model", "pruned" if task_type != "r2v" else "ref2va")
-    params.setdefault("steps", 4 if task_type != "r2v" else 20)
+    params.setdefault("steps", 20 if NATIVE_PIPELINE or task_type == "r2v" else 4)
     params.setdefault("res_mode", "custom" if task_type == "r2v" else "native")
     params.setdefault("duration", 5)
     params.setdefault("seed", -1)
     params.setdefault("low_vram", True)
+    if NATIVE_PIPELINE:
+        params["low_vram"] = False  # 原生 ComfyUI 自动管理显存，无需 T8 补丁节点。
+        params["sage"] = False
     # 解析种子 (-1 -> 随机)
     seed = int(params.get("seed", -1))
     if seed < 0:
@@ -824,8 +841,13 @@ async def generate(request):
     # turbo LoRA 自动按步数选 (4->4step, 8->8step), 用户自定义文件名优先
     if params.get("turbo_lora"):
         ln = (params.get("lora_name") or "").strip()
-        known = set(TURBO_LORAS.values()) | {DEFAULT_LORA, "minimax_h3_turbo_4STEPS_comfyui.safetensors"}
-        params["lora_name"] = ln if (ln and ln not in known) else TURBO_LORAS.get(int(params.get("steps", 8)), DEFAULT_LORA)
+        if NATIVE_PIPELINE:
+            if not ln:
+                raise web.HTTPBadRequest(text="请选择已安装的 LoRA 文件")
+            params["lora_name"] = ln
+        else:
+            known = set(TURBO_LORAS.values()) | {DEFAULT_LORA, "minimax_h3_turbo_4STEPS_comfyui.safetensors"}
+            params["lora_name"] = ln if (ln and ln not in known) else TURBO_LORAS.get(int(params.get("steps", 8)), DEFAULT_LORA)
 
     if task_type == "r2v":
         return await _generate_r2v(request, name, data, prompt, params)
@@ -1016,11 +1038,17 @@ async def comfy_status(request):
         "models": list(MODELS.keys()), "max_pixels": MAX_PIXELS, "durations": DURATIONS, "res_presets": RES_PRESETS,
         # r2v 权重探测: 名称(发现到的或占位) + 是否已存在于 models 目录
         "ref2va_model": r2v_name, "ref2va_present": model_file_present(r2v_name),
+        "native_pipeline": NATIVE_PIPELINE,
+        "model_files": MODELS,
     }
     try:
         async with session.get(f"{COMFYUI_URL}/system_stats", timeout=5) as r:
             st = await r.json()
         dev = (st.get("devices") or [{}])[0]
+        if NATIVE_PIPELINE:
+            async with session.get(f"{COMFYUI_URL}/object_info/LoraLoaderModelOnly", timeout=5) as r:
+                info = await r.json()
+            base["loras"] = info["LoraLoaderModelOnly"]["input"]["required"]["lora_name"][0]
         return web.json_response({
             "up": True,
             "vram_total": dev.get("vram_total"), "vram_free": dev.get("vram_free"),

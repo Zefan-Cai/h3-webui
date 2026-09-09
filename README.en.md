@@ -175,6 +175,14 @@ Open **http://127.0.0.1:8080** in your browser.
 
 ## ⚙️ Configuration
 
+### Native ComfyUI H3 nodes
+
+For an existing ComfyUI installation with `MiniMaxH3ImageToVideo` and `MiniMaxH3ReferenceToVideo`, set `H3WEBUI_PIPELINE=native`. This mode uses core sampling and audiovisual decode nodes without T8 or VideoHelperSuite. Set `COMFYUI_URL`, `COMFYUI_INPUT`, and `COMFYUI_OUTPUT` to the existing service and its directories.
+
+Use `H3WEBUI_TEXT_ENCODER` to select an installed encoder, such as `qwen3vl_32b_minimax_h3_bf16.safetensors`. `H3WEBUI_PRUNED_MODEL` and `H3WEBUI_FULL_MODEL` override the corresponding diffusion model filenames.
+
+Native mode defaults to 20 steps, uses ComfyUI's automatic memory management, and exposes installed LoRAs, adapter strength, sampler, and scheduler in both views. Enabling a LoRA requires an explicit filename; Turbo is not added automatically. Follow each adapter author's base-model and sampling requirements (for example, Euler + beta for AfterMidnight). Without the native setting, the original T8 pipeline remains available.
+
 Everything is overridden by **environment variables** — no config file:
 
 | Variable | Default | Description |

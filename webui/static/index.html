@@ -528,7 +528,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
           <label class="toggle"><input type="checkbox" id="stLowVram" checked><span class="box"></span><span><span data-i18n="低显存优化">低显存优化</span><span class="t-desc" data-i18n="精度无损·分块注意力">精度无损·分块注意力</span></span></label>
           <label class="toggle"><input type="checkbox" id="stSage"><span class="box"></span><span>SageAttention<span class="t-desc" data-i18n="~2×加速·近似注意力">~2×加速·近似注意力</span></span></label>
           <label class="toggle"><input type="checkbox" id="stTurbo"><span class="box"></span><span>Turbo LoRA<span class="t-desc" data-i18n="v2 full 少步用">v2 full 少步用</span></span></label>
-          <div class="field" id="stLoraField" style="display:none;margin-top:5px"><input type="text" class="txt" id="stLora" placeholder="留空=自动选" data-i18n-ph="留空=自动选"></div>
+          <div class="field" id="stLoraField" style="display:none;margin-top:5px"><input type="text" class="txt" id="stLora" list="installedLoras" placeholder="留空=自动选" data-i18n-ph="留空=自动选"></div>
+          <div class="native-settings" style="display:none">
+            <div class="field"><label>LoRA strength</label><input class="num" id="stLoraStrength" type="number" min="0" max="2" step="0.05" value="1"></div>
+            <div class="field"><label>Sampler</label><select class="sel" id="stSampler"><option value="res_multistep">res_multistep</option><option value="euler">euler</option></select></div>
+            <div class="field"><label>Scheduler</label><select class="sel" id="stScheduler"><option value="simple">simple</option><option value="beta">beta</option><option value="normal">normal</option></select></div>
+          </div>
         </div>
       </div>
       <div class="st-foot"><button class="gen-btn" id="stGen" disabled><i class="fas fa-paper-plane"></i><span data-i18n="生成">生成</span></button></div>
@@ -558,10 +563,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
       <label class="toggle"><input type="checkbox" id="pLowVram" checked><span class="box"></span><span data-i18n="低显存优化">低显存优化</span></label>
       <label class="toggle"><input type="checkbox" id="pSage"><span class="box"></span><span>SageAttention</span></label>
       <label class="toggle"><input type="checkbox" id="pTurbo"><span class="box"></span><span>Turbo LoRA</span></label>
-      <div class="field" id="pLoraField" style="display:none;margin-top:5px"><input type="text" class="txt" id="pLora" placeholder="留空=自动选" data-i18n-ph="留空=自动选"></div>
+      <div class="field" id="pLoraField" style="display:none;margin-top:5px"><input type="text" class="txt" id="pLora" list="installedLoras" placeholder="留空=自动选" data-i18n-ph="留空=自动选"></div>
+      <div class="native-settings" style="display:none">
+        <div class="field"><label>LoRA strength</label><input class="num" id="pLoraStrength" type="number" min="0" max="2" step="0.05" value="1"></div>
+        <div class="field"><label>Sampler</label><select class="sel" id="pSampler"><option value="res_multistep">res_multistep</option><option value="euler">euler</option></select></div>
+        <div class="field"><label>Scheduler</label><select class="sel" id="pScheduler"><option value="simple">simple</option><option value="beta">beta</option><option value="normal">normal</option></select></div>
+      </div>
     </div>
     <div style="display:flex;gap:8px"><button class="btn" id="pReset" style="flex:1"><span data-i18n="恢复默认">恢复默认</span></button><button class="btn primary" id="pApply" style="flex:1"><span data-i18n="应用">应用</span></button></div>
   </div>
+
+  <datalist id="installedLoras"></datalist>
 
   <!-- SHARED: LIGHTBOX -->
   <div class="lightbox" id="lightbox">
@@ -624,7 +636,7 @@ const EN_MAP={
 // task
 'i2v 单图':'i2v single image','r2v 多素材':'r2v multi-asset','单参考图 → 视频（T8 链）':'Single ref image → video (T8 chain)','任务类型':'Task type','参考素材':'Reference assets',
 '模型':'Model','分辨率模式':'Resolution','原生 (≤1920×1088)':'Native (≤1920×1088)','自定义':'Custom','宽':'W','高':'H','先上传图':'Upload an image first',
-'原生缩放':'Native scale','按比例缩小最终分辨率（显存不足时降低）':'Shrink final resolution proportionally (lower when VRAM is tight)','采样步数':'Sampling steps','时长':'Duration','种子':'Seed','-1 随机':'-1 random','加速':'Acceleration',
+'加载 LoRA':'Load LoRA','选择已安装的 LoRA':'Choose an installed LoRA','单参考图 → 视频':'Single image → video','LoRA 与采样':'LoRA and sampling','原生缩放':'Native scale','按比例缩小最终分辨率（显存不足时降低）':'Shrink final resolution proportionally (lower when VRAM is tight)','采样步数':'Sampling steps','时长':'Duration','种子':'Seed','-1 随机':'-1 random','加速':'Acceleration',
 '低显存优化':'Low-VRAM mode','精度无损·分块注意力':'Lossless · chunked attention','SageAttention':'SageAttention','~2×加速·近似注意力':'~2× faster · approximate attention','Turbo LoRA':'Turbo LoRA','v2 full 少步用':'For v2 full at few steps','留空=自动选':'Empty = auto-pick',
 '提示词':'Prompt','描述视频内容…（Ctrl+Enter 生成）':'Describe the video… (Ctrl+Enter to generate)','描述你想要的视频…（Ctrl+Enter 生成）':'Describe the video you want… (Ctrl+Enter to generate)','更多参数':'More params','参数已应用':'Params applied','恢复默认':'Reset defaults','应用':'Apply','生成参数':'Generation params','分辨率预览':'Resolution preview','步数':'Steps','按比例缩小最终分辨率':'Shrink final resolution proportionally',
 '关闭 (Esc)':'Close (Esc)','整段':'Whole','分栏':'Split','六段写在一个框里':'All six sections in one box','六段各一个输入框，自动拼装':'One box per section, auto-assembled',
@@ -691,13 +703,43 @@ function timeNow(){return new Date().toLocaleString('zh-CN',{hour12:false});}
 function relTime(ts){if(!ts)return'';const d=new Date(ts.replace(' ','T'));const diff=(Date.now()-d.getTime())/1000;if(isNaN(diff))return'';if(diff<60)return t('刚刚');if(diff<3600)return t('{n} 分钟前',{n:Math.floor(diff/60)});if(diff<86400)return t('{n} 小时前',{n:Math.floor(diff/3600)});return t('{n} 天前',{n:Math.floor(diff/86400)});}
 function mediaUrl(g,f){return'/api/workspaces/'+encodeURIComponent(App.curWs)+'/media/'+encodeURIComponent(f);}
 function isR2V(g){return (g&&(g.task_type==='r2v'||(g.params&&g.params.task_type==='r2v')));}
-function paramsChips(p){const c=[];if(p&&p.task_type==='r2v')c.push({t:t('r2v 多素材'),cls:'r2v'});c.push({t:p.model==='full'?'full':(p.model==='ref2va'?'ref2va':'pruned'),cls:p.model==='full'?'full':''});const w=p.width||p.custom_w,h=p.height||p.custom_h;c.push({t:(w&&h)?w+'×'+h:t('原生'),cls:''});c.push({t:t('{n} 步',{n:p.steps}),cls:''});c.push({t:fmtDur(p.duration||5),cls:''});if(p.sage)c.push({t:'sage',cls:'warn'});if(p.turbo_lora)c.push({t:'turbo',cls:'warn'});c.push({t:p.seed>=0?'#'+p.seed:t('随机'),cls:''});return c;}
+function paramsChips(p){const c=[];if(p&&p.task_type==='r2v')c.push({t:t('r2v 多素材'),cls:'r2v'});c.push({t:p.model==='full'?'full':(p.model==='ref2va'?'ref2va':'pruned'),cls:p.model==='full'?'full':''});const w=p.width||p.custom_w,h=p.height||p.custom_h;c.push({t:(w&&h)?w+'×'+h:t('原生'),cls:''});c.push({t:t('{n} 步',{n:p.steps}),cls:''});c.push({t:fmtDur(p.duration||5),cls:''});if(p.sage)c.push({t:'sage',cls:'warn'});if(p.turbo_lora)c.push({t:App.settings.native_pipeline?'LoRA':'turbo',cls:'warn'});c.push({t:p.seed>=0?'#'+p.seed:t('随机'),cls:''});return c;}
 function refsCountBadge(n){return n?`<span class="badge-refs"><i class="fas fa-images"></i> r2v ×${n}</span>`:'';}
 function audioRefsBadge(n){return n?`<span class="badge-refs"><i class="fas fa-microphone"></i> ${t('音频')}×${n}</span>`:'';}
 function REF_TIP_HTML(){return t('图按上传顺序编号，提示词用 <b>&lt;Picture N&gt;</b> 引用（主体用 <b>&lt;Subject N&gt;</b>，勿用 &lt;Object x&gt;）。可选加 <b>&lt;=3 段音频</b> 作音色参考，用 <b>&lt;Audio N&gt;</b> 引用（每段 2–15s）');}
 
 // ===== COMFY + WORKSPACES =====
-async function checkComfy(){try{const s=await api('/api/comfyui/status');$('comfyDot').className='dot '+(s.up?'up':'down');$('comfyTxt').textContent=s.up?t('在线'):t('离线');if(s.durations)App.settings.durations=s.durations;if(s.res_presets)App.settings.res_presets=s.res_presets;if(s.max_pixels)App.settings.max_pixels=s.max_pixels;if(typeof s.ref2va_present!=='undefined'){App.settings.ref2va_present=s.ref2va_present;App.settings.ref2va_model=s.ref2va_model||'';syncTaskUI();}}catch(e){$('comfyDot').className='dot down';$('comfyTxt').textContent=t('离线');}}
+function configureNativeUI(s){
+  if(!s.native_pipeline)return;
+  const first=!App.settings.native_pipeline;
+  App.settings.native_pipeline=true;
+  if(first){
+    Object.assign(App.params,{steps:20,low_vram:false,sage:false,res_mode:'custom',custom_w:864,custom_h:480});
+    ['pLowVram','stLowVram','pSage','stSage'].forEach(id=>$(id).closest('label').style.display='none');
+    $('chipSage').style.display='none';
+    ['p','st'].forEach(pre=>{
+      const label=$(pre+'Turbo').closest('label').lastElementChild;label.dataset.i18n='加载 LoRA';label.textContent=t('加载 LoRA');
+      $(pre+'Lora').placeholder=t('选择已安装的 LoRA');
+      $(pre+'Lora').setAttribute('data-i18n-ph','选择已安装的 LoRA');
+      [...$(pre+'Model').options].forEach(o=>{if(o.value==='full'){o.textContent=t('完整 full（质量）');o.setAttribute('data-i18n','完整 full（质量）');}});
+    });
+    document.querySelectorAll('.native-settings').forEach(el=>{el.style.display='block';const title=el.closest('.st-sec,.pop-sec').querySelector('.st-title span,.pop-title span');if(title){title.dataset.i18n='LoRA 与采样';title.textContent=t('LoRA 与采样');}});
+    syncTaskUI();syncStudioPanel();syncPopup();
+  }
+  $('installedLoras').innerHTML=(s.loras||[]).map(n=>`<option value="${esc(n)}"></option>`).join('');
+}
+function syncNativeParams(pre){
+  $(pre+'LoraStrength').value=App.params.lora_strength??1;
+  $(pre+'Sampler').value=App.params.sampler||'res_multistep';
+  $(pre+'Scheduler').value=App.params.scheduler||'simple';
+}
+function collectNativeParams(pre){
+  if(!App.settings.native_pipeline)return;
+  App.params.lora_strength=Number($(pre+'LoraStrength').value);
+  App.params.sampler=$(pre+'Sampler').value;
+  App.params.scheduler=$(pre+'Scheduler').value;
+}
+async function checkComfy(){try{const s=await api('/api/comfyui/status');configureNativeUI(s);$('comfyDot').className='dot '+(s.up?'up':'down');$('comfyTxt').textContent=s.up?t('在线'):t('离线');if(s.durations)App.settings.durations=s.durations;if(s.res_presets)App.settings.res_presets=s.res_presets;if(s.max_pixels)App.settings.max_pixels=s.max_pixels;if(typeof s.ref2va_present!=='undefined'){App.settings.ref2va_present=s.ref2va_present;App.settings.ref2va_model=s.ref2va_model||'';syncTaskUI();}}catch(e){$('comfyDot').className='dot down';$('comfyTxt').textContent=t('离线');}}
 async function loadWorkspaces(){App.workspaces=await api('/api/workspaces');const sel=$('wsSel');sel.innerHTML=App.workspaces.map(w=>`<option value="${esc(w.name)}">${esc(w.name)} (${w.count})</option>`).join('');if(App.curWs)sel.value=App.curWs;renderResPresets();renderDurGrid();}
 async function selectWs(name){App.curWs=name;$('wsSel').value=name;App.uploadedImage=null;App.refsImages=[];App.currentGen=null;resetImgUIs();await loadGens();}
 async function loadGens(){if(!App.curWs){App.gens=[];renderActive();return;}try{App.gens=await api('/api/workspaces/'+encodeURIComponent(App.curWs)+'/generations');}catch(e){App.gens=[];}App.gens.sort((a,b)=>(b.timestamp||'').localeCompare(a.timestamp||''));if(!App.currentGen&&App.gens.length)App.currentGen=App.gens[0];renderActive();}
@@ -738,7 +780,7 @@ function applyTask(t){
     if(App.params.steps<=8)App.params.steps=20; // 非 turbo 官方常用步数
   }else{
     if(App.params.model==='ref2va')App.params.model='pruned';
-    if(App.params.steps>12)App.params.steps=4;
+    if(!App.settings.native_pipeline&&App.params.steps>12)App.params.steps=4;
     // 切回 i2v: 若无单图, 取第1张参考图兜底 (参考素材仍在 refs, 可再切回)
     if(!App.uploadedImage&&App.refsImages.length)App.uploadedImage=App.refsImages[0];
   }
@@ -750,7 +792,7 @@ function syncTaskUI(){
   [['stTaskSeg','stTaskTip'],['pTaskSeg','pTaskTip']].forEach(([segId,tipId])=>{
     const seg=$(segId);if(!seg)return;
     seg.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.t===(r2v?'r2v':'i2v')));
-    $(tipId).textContent=r2v?t('多素材参考（核心节点链）→ 图片按 <Picture N> 引用'):t('单参考图 → 视频（T8 链）');
+    $(tipId).textContent=r2v?t('多素材参考（核心节点链）→ 图片按 <Picture N> 引用'):(App.settings.native_pipeline?t('单参考图 → 视频'):t('单参考图 → 视频（T8 链）'));
   });
   // 模型下拉: r2v 锁 ref2va; i2v 锁 pruned/full
   const stM=$('stModel'),pM=$('pModel');
@@ -758,7 +800,7 @@ function syncTaskUI(){
   // 分辨率: r2v 无 native 语义 -> 禁用 native 选项并强制 custom
   ['stResMode','pResMode'].forEach(id=>{const s=$(id);if(s){[...s.options].forEach(o=>o.disabled=r2v&&o.value==='native');if(r2v&&s.value==='native'){s.value='custom';App.params.res_mode='custom';}}});
   // 步数上限: r2v 官方 20 步起步 -> 50; i2v turbo 档 -> 12
-  ['stSteps','pSteps'].forEach(id=>{const s=$(id);if(s){s.max=r2v?50:12;if(+s.value>+s.max)s.value=s.max;}});
+  ['stSteps','pSteps'].forEach(id=>{const s=$(id);if(s){s.max=(r2v||App.settings.native_pipeline)?50:12;if(+s.value>+s.max)s.value=s.max;}});
   ['stStepsVal','pStepsVal'].forEach(id=>{const el=$(id);if(el)el.textContent=App.params.steps;});
   // Studio 参考区显隐
   const r2vPanel=!!$('stRefGrid');
@@ -907,7 +949,7 @@ function syncPopup(){
   $('pSeed').value=App.params.seed;
   $('pLowVram').checked=App.params.low_vram;$('pSage').checked=App.params.sage;$('pTurbo').checked=App.params.turbo_lora;
   $('pLora').value=App.params.lora_name;$('pLoraField').style.display=App.params.turbo_lora?'block':'none';
-  syncChips();updateResPreviews();
+  syncNativeParams('p');syncChips();updateResPreviews();
 }
 function collectPopup(){
   App.params.model=$('pModel').value;App.params.res_mode=$('pResMode').value;
@@ -916,7 +958,7 @@ function collectPopup(){
   App.params.steps=parseInt($('pSteps').value);App.params.duration=parseInt($('pDuration').value)||5;
   App.params.seed=parseInt($('pSeed').value)||-1;
   App.params.low_vram=$('pLowVram').checked;App.params.sage=$('pSage').checked;App.params.turbo_lora=$('pTurbo').checked;
-  App.params.lora_name=$('pLora').value.trim();
+  App.params.lora_name=$('pLora').value.trim();collectNativeParams('p');
 }
 function syncChips(){
   $('chipModel').querySelector('span').textContent=App.params.model==='full'?t('完整'):(App.params.model==='ref2va'?t('参考'):t('剪枝'));
@@ -936,7 +978,7 @@ $('pDuration').onchange=()=>{App.params.duration=parseInt($('pDuration').value)|
 $('pRandSeed').onclick=()=>{$('pSeed').value=Math.floor(Math.random()*2**31);};
 $('pTurbo').onchange=()=>{$('pLoraField').style.display=$('pTurbo').checked?'block':'none';};
 $('pApply').onclick=()=>{collectPopup();syncChips();closePopup();showToast(t('参数已应用'),'check');};
-$('pReset').onclick=()=>{App.params={model:'pruned',steps:4,res_mode:'native',custom_w:1280,custom_h:720,duration:5,seed:-1,low_vram:true,sage:false,turbo_lora:false,lora_name:'',native_scale:1.0};syncPopup();renderDurGrid();};
+$('pReset').onclick=()=>{App.params={model:'pruned',steps:4,res_mode:'native',custom_w:1280,custom_h:720,duration:5,seed:-1,low_vram:true,sage:false,turbo_lora:false,lora_name:'',native_scale:1.0};if(App.settings.native_pipeline)Object.assign(App.params,{steps:20,low_vram:false,res_mode:'custom',custom_w:864,custom_h:480});syncPopup();renderDurGrid();};
 $('chipModel').onclick=()=>{if(taskIsR2V()){showToast(t('r2v 模式模型锁定 ref2va'),'warn');return;}App.params.model=App.params.model==='full'?'pruned':'full';syncPopup();};
 $('chipRes').onclick=()=>{if(taskIsR2V()){showToast(t('r2v 无 native 模式（参考图不裁剪）'),'warn');return;}App.params.res_mode=App.params.res_mode==='custom'?'native':'custom';syncPopup();};
 $('chipSage').onclick=()=>{App.params.sage=!App.params.sage;syncChips();};
@@ -956,7 +998,7 @@ function syncStudioPanel(){
   $('stSeed').value=App.params.seed;
   $('stLowVram').checked=App.params.low_vram;$('stSage').checked=App.params.sage;$('stTurbo').checked=App.params.turbo_lora;
   $('stLora').value=App.params.lora_name;$('stLoraField').style.display=App.params.turbo_lora?'block':'none';
-  renderDurGrid();updateResPreviews();
+  syncNativeParams('st');renderDurGrid();updateResPreviews();
 }
 function collectStudioPanel(){
   App.params.model=$('stModel').value;App.params.res_mode=$('stResMode').value;
@@ -965,7 +1007,7 @@ function collectStudioPanel(){
   App.params.steps=parseInt($('stSteps').value);
   App.params.seed=parseInt($('stSeed').value)||-1;
   App.params.low_vram=$('stLowVram').checked;App.params.sage=$('stSage').checked;App.params.turbo_lora=$('stTurbo').checked;
-  App.params.lora_name=$('stLora').value.trim();
+  App.params.lora_name=$('stLora').value.trim();collectNativeParams('st');
 }
 $('stModel').onchange=()=>{App.params.model=$('stModel').value;};
 $('stResMode').onchange=()=>{App.params.res_mode=$('stResMode').value;syncStudioPanel();};
@@ -1248,7 +1290,7 @@ $('stSearch').oninput=renderStudioLeft;
 function reuseParams(g, opts={}){
   if(!g)return;const p=g.params;
   const r2v=isR2V(g);
-  App.params={model:r2v?'ref2va':p.model,steps:p.steps,res_mode:r2v?'custom':p.res_mode,custom_w:p.custom_w||p.width||1280,custom_h:p.custom_h||p.height||720,duration:p.duration||5,seed:p.seed||-1,low_vram:p.low_vram!==false,sage:!!p.sage,turbo_lora:!!p.turbo_lora,lora_name:p.lora_name||'',native_scale:p.native_scale||1.0,task_type:r2v?'r2v':'i2v'};
+  App.params={model:r2v?'ref2va':p.model,steps:p.steps,res_mode:r2v?'custom':p.res_mode,custom_w:p.custom_w||p.width||1280,custom_h:p.custom_h||p.height||720,duration:p.duration||5,seed:p.seed||-1,low_vram:p.low_vram!==false,sage:!!p.sage,turbo_lora:!!p.turbo_lora,lora_name:p.lora_name||'',lora_strength:p.lora_strength??1,sampler:p.sampler||'res_multistep',scheduler:p.scheduler||'simple',native_scale:p.native_scale||1.0,task_type:r2v?'r2v':'i2v'};
   App.prompt=g.prompt||'';
   // 参考素材: r2v -> refsImages/refsAudios; i2v -> uploadedImage (续写复用截帧后的新图优先)
   if(r2v){
